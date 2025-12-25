@@ -1,13 +1,13 @@
 # 🎮 Game of War - Automated Multi-Account Jewel Claiming System
 
-Automated browser-based system for claiming free daily jewels (75 per character) from Game of War accounts. Supports **multi-character accounts** and **batch processing** for up to 344 accounts.
+Automated browser-based system for claiming free daily jewels from Game of War accounts. Supports **multi-character accounts** and **batch processing**.
 
 ---
 
 ## ✨ Key Features
 
 - ✅ **Multi-Character Support**: Automatically detects and claims jewels for ALL characters on each account
-- ✅ **Batch Processing**: Process all 344 accounts or specific ranges
+- ✅ **Batch Processing**: Process all accounts or specific ranges
 - ✅ **Anti-Bot Detection Bypass**: Uses real browser automation (Playwright) to avoid detection
 - ✅ **Detailed Logging**: Timestamped logs with success/failure tracking
 - ✅ **Screenshot Capture**: Saves screenshots for verification (optional)
@@ -17,27 +17,11 @@ Automated browser-based system for claiming free daily jewels (75 per character)
 
 ---
 
-## 📊 Expected Earnings
-
-### Current Setup (344 Accounts)
-
-**Single-Character Accounts:**
-- Per account: **75 jewels/day**
-- 344 accounts: **25,800 jewels/day**
-- Monthly: **~774,000 jewels**
-
-**Multi-Character Accounts:**
-- Per character: **75 jewels/day**
-- Example: 2 characters = **150 jewels/day**
-- Potential: **50-100% more jewels** if many accounts have multiple characters
-
----
-
 ## 🚀 Quick Start
 
 ```bash
 # 1. Navigate to project directory
-cd /Users/johnalvero/godofwar
+cd godofwar
 
 # 2. Activate virtual environment
 source .venv/bin/activate
@@ -64,7 +48,7 @@ python claim_all_characters.py
 
 1. **Clone/download the project**
    ```bash
-   cd /Users/johnalvero/godofwar
+   cd godofwar
    ```
 
 2. **Activate virtual environment**
@@ -74,7 +58,7 @@ python claim_all_characters.py
 
 3. **Install dependencies** (if not already installed)
    ```bash
-   pip install playwright
+   pip install -r requirements.txt
    playwright install chromium
    ```
 
@@ -86,11 +70,8 @@ python claim_all_characters.py
 godofwar/
 ├── users.txt                    # Account credentials (email:password format)
 ├── claim_all_characters.py      # ⭐ Main script - Multi-character support
-├── claim_batch.py               # Legacy - Single character only
-├── claim_all.py                 # Legacy - Single character only
 ├── screenshots/                 # Screenshot storage (auto-created)
 ├── logs/                        # Cron job logs (create if using cron)
-├── farms.csv                    # Original CSV of accounts
 └── README.md                    # This file
 ```
 
@@ -103,13 +84,12 @@ godofwar/
 One account per line in the format `email:password`:
 
 ```
-webero7246@plexfirm.com:6621abcd
-user123@example.com:password123
-meunknown374@yahoo.com:popcorn1993
+user321@example.com:mypassword
+user123@example.com:mypassword
+user456@yahoo.com:mypassword
 ```
 
 **Notes:**
-- **Total accounts**: 344
 - Blank lines and lines starting with `#` are ignored
 - Keep this file secure (contains plaintext passwords)
 
@@ -127,14 +107,14 @@ echo "newemail@example.com:newpassword" >> users.txt
 
 ### 1. Process All Accounts
 
-Run without parameters to process all 344 accounts:
+Run without parameters to process all accounts:
 
 ```bash
 source .venv/bin/activate
 python claim_all_characters.py
 ```
 
-**Expected runtime**: ~3-4 hours for all 344 accounts (30-40 seconds per account)
+**Expected runtime**: 30-40 seconds per account
 
 ### 2. Process Specific Range
 
@@ -153,7 +133,7 @@ python claim_all_characters.py 325 325
 
 ### 3. Recommended Batch Strategy
 
-Split 344 accounts into 7 batches to avoid long single runs:
+Split large accounts into batches to avoid long single runs:
 
 ```bash
 # Batch 1: Lines 1-50 (50 accounts)
@@ -161,21 +141,6 @@ python claim_all_characters.py 1 50
 
 # Batch 2: Lines 51-100 (50 accounts)
 python claim_all_characters.py 51 100
-
-# Batch 3: Lines 101-150 (50 accounts)
-python claim_all_characters.py 101 150
-
-# Batch 4: Lines 151-200 (50 accounts)
-python claim_all_characters.py 151 200
-
-# Batch 5: Lines 201-250 (50 accounts)
-python claim_all_characters.py 201 250
-
-# Batch 6: Lines 251-300 (50 accounts)
-python claim_all_characters.py 251 300
-
-# Batch 7: Lines 301-344 (44 accounts)
-python claim_all_characters.py 301 344
 ```
 
 ---
@@ -191,7 +156,7 @@ python claim_all_characters.py 301 344
 
 Create logs directory:
 ```bash
-mkdir -p /Users/johnalvero/godofwar/logs
+mkdir -p godofwar/logs
 ```
 
 Edit your crontab:
@@ -203,25 +168,10 @@ Add the following schedules (7 batches from 1 AM - 7 AM UTC):
 
 ```bash
 # Game of War Jewel Claiming - Batch 1 (Lines 1-50)
-0 1 * * * cd /Users/johnalvero/godofwar && source .venv/bin/activate && python claim_all_characters.py 1 50 >> /Users/johnalvero/godofwar/logs/batch1.log 2>&1
+0 1 * * * cd /Users/<user>/godofwar && source .venv/bin/activate && python claim_all_characters.py 1 50 >> /Users/johnalvero/godofwar/logs/batch1.log 2>&1
 
 # Game of War Jewel Claiming - Batch 2 (Lines 51-100)
-0 2 * * * cd /Users/johnalvero/godofwar && source .venv/bin/activate && python claim_all_characters.py 51 100 >> /Users/johnalvero/godofwar/logs/batch2.log 2>&1
-
-# Game of War Jewel Claiming - Batch 3 (Lines 101-150)
-0 3 * * * cd /Users/johnalvero/godofwar && source .venv/bin/activate && python claim_all_characters.py 101 150 >> /Users/johnalvero/godofwar/logs/batch3.log 2>&1
-
-# Game of War Jewel Claiming - Batch 4 (Lines 151-200)
-0 4 * * * cd /Users/johnalvero/godofwar && source .venv/bin/activate && python claim_all_characters.py 151 200 >> /Users/johnalvero/godofwar/logs/batch4.log 2>&1
-
-# Game of War Jewel Claiming - Batch 5 (Lines 201-250)
-0 5 * * * cd /Users/johnalvero/godofwar && source .venv/bin/activate && python claim_all_characters.py 201 250 >> /Users/johnalvero/godofwar/logs/batch5.log 2>&1
-
-# Game of War Jewel Claiming - Batch 6 (Lines 251-300)
-0 6 * * * cd /Users/johnalvero/godofwar && source .venv/bin/activate && python claim_all_characters.py 251 300 >> /Users/johnalvero/godofwar/logs/batch6.log 2>&1
-
-# Game of War Jewel Claiming - Batch 7 (Lines 301-344)
-0 7 * * * cd /Users/johnalvero/godofwar && source .venv/bin/activate && python claim_all_characters.py 301 344 >> /Users/johnalvero/godofwar/logs/batch7.log 2>&1
+0 2 * * * cd /Users/<user>/godofwar && source .venv/bin/activate && python claim_all_characters.py 51 100 >> /Users/johnalvero/godofwar/logs/batch2.log 2>&1
 ```
 
 ### Verify Cron Jobs
@@ -277,39 +227,6 @@ tail -f /Users/johnalvero/godofwar/logs/batch1.log
 
 ---
 
-## 📈 Output Format
-
-### Console Output Example
-
-```
-[2025-12-25 21:01:13] [INFO] ============================================================
-[2025-12-25 21:01:13] [INFO] Game of War - Multi-Character Claim (Lines 325-325)
-[2025-12-25 21:01:13] [INFO] ============================================================
-[2025-12-25 21:01:13] [INFO] Found 1 account(s) to process
-[2025-12-25 21:01:13] [INFO] ------------------------------------------------------------
-[2025-12-25 21:01:26] [INFO] [meunknown374@yahoo.com] 🎮 Found 2 characters!
-[2025-12-25 21:01:26] [INFO] [meunknown374@yahoo.com] ==================================================
-[2025-12-25 21:01:26] [INFO] [meunknown374@yahoo.com] Processing Character 1/2
-[2025-12-25 21:01:37] [SUCCESS] [meunknown374@yahoo.com] Character 1/2: ✓ Already claimed
-[2025-12-25 21:01:40] [INFO] [meunknown374@yahoo.com] ✓ Character selection opened
-[2025-12-25 21:01:40] [INFO] [meunknown374@yahoo.com] ==================================================
-[2025-12-25 21:01:40] [INFO] [meunknown374@yahoo.com] Processing Character 2/2
-[2025-12-25 21:01:51] [SUCCESS] [meunknown374@yahoo.com] Character 2/2: ✅ Claimed 75 jewels!
-[2025-12-25 21:01:51] [INFO] [meunknown374@yahoo.com] ==================================================
-[2025-12-25 21:01:51] [SUCCESS] [meunknown374@yahoo.com] 💎 ACCOUNT COMPLETE: Claimed 2/2 characters
-[2025-12-25 21:01:51] [INFO] ============================================================
-[2025-12-25 21:01:51] [INFO] MULTI-CHARACTER BATCH SUMMARY
-[2025-12-25 21:01:51] [INFO] ============================================================
-[2025-12-25 21:01:51] [INFO] ✅ 2/2 chars (Line 325): meunknown374@yahoo.com
-[2025-12-25 21:01:51] [INFO] ------------------------------------------------------------
-[2025-12-25 21:01:51] [INFO] Accounts Processed: 1
-[2025-12-25 21:01:51] [INFO] Accounts Success: 1
-[2025-12-25 21:01:51] [INFO] Accounts Failed: 0
-[2025-12-25 21:01:51] [INFO] Total Characters Found: 2
-[2025-12-25 21:01:51] [INFO] Total Jewels Claimed: 150 💎
-[2025-12-25 21:01:51] [INFO] ============================================================
-```
-
 ### Status Indicators
 
 - ✅ **Claimed successfully**: Jewels were claimed this run
@@ -333,7 +250,7 @@ playwright install chromium
 ```
 
 **2. "Users file not found"**
-- Verify `users.txt` exists in `/Users/johnalvero/godofwar/`
+- Verify `users.txt` exists in `/Users/<user>/godofwar/`
 - Check file permissions
 
 **3. "Timeout" errors**
@@ -399,49 +316,6 @@ export GOW_USERS_FILE="/Users/johnalvero/godofwar/users.txt"
 
 ---
 
-## 🚨 Why Direct API Calls Failed
-
-The Game of War API has **anti-bot protection** that blocks:
-- ❌ Simple HTTP requests (even with headers)
-- ❌ n8n workflows
-- ❌ Standard Python requests
-- ❌ All direct API calls return 500 Internal Server Error
-
-**Solution:** Browser automation (Playwright) is indistinguishable from a real user.
-
-### Why Browser Automation Works
-
-- ✅ Uses real browser (bypasses bot detection)
-- ✅ Executes JavaScript (like a real user)
-- ✅ Maintains proper cookies and sessions
-- ✅ Has realistic timing and behavior
-- ✅ Can adapt to UI changes easily
-- ✅ No reverse engineering required
-
----
-
-## 🔄 Migrating from Legacy Scripts
-
-### From claim_batch.py or claim_all.py
-
-**Old script (single character only)**:
-```bash
-python claim_batch.py 1 50
-```
-
-**New script (multi-character support)**:
-```bash
-python claim_all_characters.py 1 50
-```
-
-**Key differences**:
-- ✅ `claim_all_characters.py`: Loops through ALL characters on each account
-- ❌ `claim_batch.py` / `claim_all.py`: Only claims for the FIRST character
-
-**Recommendation**: Use `claim_all_characters.py` for all future runs to maximize jewel earnings.
-
----
-
 ## 📝 Version History
 
 ### v2.0 (2025-12-25) - Multi-Character Support
@@ -469,7 +343,7 @@ python claim_all_characters.py 1 50
 # Show help
 python claim_all_characters.py --help
 
-# Process all 344 accounts
+# Process all accounts
 python claim_all_characters.py
 
 # Process specific range
@@ -490,7 +364,7 @@ grep -n "email@example.com" users.txt
 
 ```bash
 # 1. Navigate to project
-cd /Users/johnalvero/godofwar
+cd /Users/<user>/godofwar
 
 # 2. Activate environment
 source .venv/bin/activate
@@ -503,46 +377,15 @@ python claim_all_characters.py
 
 # 5. Set up automation (optional)
 crontab -e
-# Add: 0 1 * * * cd /Users/johnalvero/godofwar && source .venv/bin/activate && python claim_all_characters.py >> /Users/johnalvero/godofwar/logs/daily.log 2>&1
+# Add: 0 1 * * * cd /Users/<user>/godofwar && source .venv/bin/activate && python claim_all_characters.py >> /Users/<user>/godofwar/logs/daily.log 2>&1
 
 # 6. Monitor logs
-tail -f /Users/johnalvero/godofwar/logs/daily.log
+tail -f /Users/<user>/godofwar/logs/daily.log
 ```
 
 ---
 
-## 🆘 Support & FAQ
 
-### Q: How long does it take to process all accounts?
-**A:** ~3-4 hours for 344 accounts (30-40 seconds per account)
-
-### Q: Can I run multiple batches simultaneously?
-**A:** Not recommended - may trigger rate limiting. Use cron to run batches sequentially.
-
-### Q: What if an account fails?
-**A:** Script continues with remaining accounts. Check logs for specific error.
-
-### Q: How do I know if jewels were actually claimed?
-**A:** Look for "✅ Claimed 75 jewels!" in logs. Script verifies by checking for "Available again at" text.
-
-### Q: Can I stop the script mid-run?
-**A:** Yes, press `Ctrl+C`. It will stop gracefully after current account completes.
-
-### Q: Do I need to keep my computer on?
-**A:** Yes, for cron jobs to run. Consider using a server or always-on Mac.
-
----
-
-## 📞 Contact & Issues
-
-For issues or questions:
-1. Check the **Troubleshooting** section above
-2. Review console logs for error messages
-3. Run in debug mode (non-headless) to observe behavior
-4. Verify Game of War website is accessible
-5. Check credentials in users.txt
-
----
 
 ## 🏆 What This Achieves
 
@@ -552,7 +395,7 @@ For issues or questions:
 4. 🎯 **Detects all characters** on each account
 5. 💎 **Claims 75 jewels per character** automatically
 6. 📊 **Logs detailed results** to file
-7. 🔄 **Repeats for all 344 accounts** every day
+7. 🔄 **Repeats for all accounts** every day
 8. ✅ **Set it and forget it!** 🚀
 
 ---
