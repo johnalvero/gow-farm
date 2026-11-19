@@ -529,6 +529,19 @@ A laptop still sleeps when its lid is closed. The service starts only once someo
 
 The service's log is `dashboard/data/dashboard-service.log` in the project folder. Past 1 MB, the old part moves to `dashboard-service.log.1`. A dashboard run's own output still goes to `dashboard/data/last-run.log`.
 
+### Updating from GitHub
+
+**One-time setup** on a Mac whose project folder was copied over rather than cloned. It connects the existing folder to GitHub and keeps `.venv`, `users.txt` and the run history, since none of them are in the repo:
+
+```bash
+cd ~/gow && git init && git remote add origin https://github.com/johnalvero/gow-farm.git && git fetch origin && git checkout -f -B main origin/main
+```
+
+**After that**, double-click `update.command` in the project folder. It downloads the latest code, restarts the always-on dashboard if it's installed, and waits for you to press Enter before closing. It never installs Python packages.
+
+- If it says a claim run is going, double-click it again after the run finishes.
+- If it mentions local changes, a project file was edited on that Mac, and nothing was updated.
+
 ### Connection status
 
 The strip at the top of the page shows whether the internet and the game site can be reached. A connection problem never pauses or stops a run. If the status isn't good, Start and Retry ask you to confirm with `Start anyway` or `Retry anyway`, and during a run a banner warns that accounts may be failing.
