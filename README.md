@@ -531,13 +531,20 @@ The service's log is `dashboard/data/dashboard-service.log` in the project folde
 
 ### Updating from GitHub
 
+**The Update button.** Under the title, the page shows the version it runs, for example `Version e2977a7 · 2026-11-18`. The dashboard checks GitHub for new code when it starts and every 3 hours after that; **Check for updates** checks now. When there is new code, it shows `1 change available` (or more) and an **Update** button. Click it and the dashboard downloads the new code, restarts itself in place, and the page reloads by itself with `The dashboard was updated.` No Terminal is needed.
+
+- Update is refused while a claim run is going: the button reads `Update after this run`.
+- It never installs Python packages, and it never replaces a file kept only on this Mac, such as `users.txt`, `.venv` or the run history. If an update would, it is refused and nothing is changed.
+- Before restarting, it checks that the new code starts. If it doesn't, the update is undone and the dashboard keeps running the old code.
+- If the page says `The dashboard didn't come back after updating`, look at `dashboard/data/dashboard-service.log`, or use `update.command` below.
+
 **One-time setup** on a Mac whose project folder was copied over rather than cloned. It connects the existing folder to GitHub and keeps `.venv`, `users.txt` and the run history, since none of them are in the repo:
 
 ```bash
 cd ~/gow && git init && git remote add origin https://github.com/johnalvero/gow-farm.git && git fetch origin && git checkout -f -B main origin/main
 ```
 
-**After that**, double-click `update.command` in the project folder. It downloads the latest code, restarts the always-on dashboard if it's installed, and waits for you to press Enter before closing. It never installs Python packages.
+**The fallback: `update.command`.** Double-click `update.command` in the project folder. It downloads the latest code, restarts the always-on dashboard if it's installed, and waits for you to press Enter before closing. It never installs Python packages. Use it if the Update button reports a problem, or if an update changes how the always-on service starts (`dashboard/service.sh` or `dashboard/service_helper.py`): the button restarts the dashboard but doesn't set the service up again.
 
 - If it says a claim run is going, double-click it again after the run finishes.
 - If it mentions local changes, a project file was edited on that Mac, and nothing was updated.
@@ -550,6 +557,8 @@ While the page is open or a run is live, the server contacts:
 
 - `https://www.gstatic.com/generate_204` every 30 seconds, to check the internet. Only a 204 answer counts, so a captive portal reads as no internet. This tells Google the machine is online. Set `GOW_INTERNET_CHECK_URL` to use another target.
 - The game site's login page every 2 minutes, with a `HEAD` request. It carries no cookies and no account data. Any answer below 500 counts as reachable, so `game site OK` means the site answered, not that claims will work.
+
+Separately, to check for updates, the server runs `git fetch` against the project's GitHub remote when it starts and every 3 hours, whether or not the page is open. It sends no account data. Set `GOW_UPDATE_CHECKS=off` to stop it; the page then shows `Update checks are off.`
 
 The checks ignore system proxies, and the result is not saved. With neither the page nor a run active, no checks are made.
 

@@ -3,6 +3,7 @@
 Game of War - Local dashboard server
 Serves the page on 127.0.0.1 and starts or stops one claim run at a time.
 Usage: .venv/bin/python dashboard/server.py [--port N]
+       .venv/bin/python dashboard/server.py --check
 """
 
 import argparse
@@ -21,11 +22,12 @@ DASHBOARD_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.dirname(DASHBOARD_DIR)
 sys.path.insert(0, BASE_DIR)
 
-from dashboard import events, network, store  # noqa: E402
+from dashboard import events, network, store, updater  # noqa: E402
 
 HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
 CLAIM_SCRIPT = os.path.join(BASE_DIR, "claim_all_characters.py")
+SERVER_SCRIPT = os.path.join(DASHBOARD_DIR, "server.py")
 CONCURRENCY_CHOICES = (1, 2, 3, 5)
 MAX_BODY_BYTES = 1024
 REQUEST_TIMEOUT_SECONDS = 10
@@ -35,11 +37,15 @@ START_TIMEOUT_SECONDS = 60
 STOP_GRACE_SECONDS = 75
 STOP_KILL_SECONDS = 10
 MONITOR_SECONDS = 0.2
+# Long enough for the update's answer to leave before the server stops
+RESTART_DELAY_SECONDS = 0.2
 
 CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; "
        "base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 
-POST_ROUTES = ("/api/run", "/api/retry", "/api/stop")
+POST_ROUTES = ("/api/run", "/api/retry", "/api/stop", "/api/update", "/api/update-check")
+NO_FIELD_ROUTES = ("/api/stop", "/api/update", "/api/update-check")
+UPDATES_OFF = "Update checks are off for this dashboard."
 STATIC_FILES = {
     "/": ("index.html", "text/html; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
@@ -88,6 +94,7 @@ class RunControl:
         self.phase = None
         self.error = None
         self.stop_deadline = None
+        self.updating = False
 
     def state(self):
         with self.lock:
@@ -120,6 +127,9 @@ class RunControl:
 
     def start(self, concurrency, retry=False):
         with self.lock:
+            if self.updating:
+                raise RunRefused(409, "The dashboard is updating")
+
             if self.child is not None:
                 raise RunRefused(409, "A run is already going")
 
@@ -142,6 +152,20 @@ class RunControl:
             self.stop_deadline = None
 
         threading.Thread(target=self.monitor, args=(child,), name="gow-monitor", daemon=True).start()
+
+    def begin_update(self):
+        """Hold off new runs while the code is replaced. Refused while any run is live"""
+        with self.lock:
+            if self.child is not None or self.store.snapshot()["live"]:
+                raise RunRefused(409, "A claim run is going. Update after it finishes.")
+            if self.updating:
+                raise RunRefused(409, "The dashboard is updating")
+            self.updating = True
+
+    def end_update(self):
+        """Only after a refused update: a done one stays set until the restart"""
+        with self.lock:
+            self.updating = False
 
     def stop(self):
         with self.lock:
@@ -354,21 +378,51 @@ class Handler(BaseHTTPRequestHandler):
         if body is None:
             return
 
+        if self.path in NO_FIELD_ROUTES and body:
+            return self.refuse(400, "No fields are accepted")
+
         control = self.server.control
         try:
             if self.path == "/api/stop":
-                if body:
-                    return self.refuse(400, "No fields are accepted")
                 control.stop()
+            elif self.path == "/api/update-check":
+                if not self.server.updater.enabled:
+                    raise RunRefused(409, UPDATES_OFF)
+                self.server.updater.check_soon()
+            elif self.path == "/api/update":
+                return self.update()
             else:
                 concurrency = self.concurrency_of(body)
                 if concurrency is None:
                     return
                 control.start(concurrency, retry=self.path == "/api/retry")
-        except RunRefused as e:
+        except (RunRefused, updater.UpdateRefused) as e:
             return self.refuse(e.status, e.message)
 
         self.respond_json(200, {"ok": True})
+
+    def update(self):
+        """Fast-forward the project, answer, then restart this server into the new code"""
+        if not self.server.updater.enabled:
+            raise RunRefused(409, UPDATES_OFF)
+
+        control = self.server.control
+        control.begin_update()
+        try:
+            old, new = self.server.updater.apply()
+        except BaseException:
+            control.end_update()
+            raise
+
+        # The files are already new: the restart must follow even if the answer
+        # can't be sent, or this server would keep refusing runs as updating
+        try:
+            # No URL and no git output: this goes to the service's log
+            print(f"Updated from {old['commit']} to {new['commit']}; restarting", flush=True)
+            self.respond_json(200, {"ok": True, "restarting": True, "version": new["commit"]})
+            self.wfile.flush()
+        finally:
+            self.server.request_restart()
 
 class DashboardServer(ThreadingHTTPServer):
     daemon_threads = True
@@ -384,6 +438,9 @@ class DashboardServer(ThreadingHTTPServer):
         self.control = RunControl(self.store)
         self.network = network.NetworkMonitor(self.run_is_live)
         self.network.start()
+        self.updater = updater.Updater()
+        self.updater.start()
+        self.restart = False
 
     def run_is_live(self):
         return self.control.state()["owned"] or self.store.any_live()
@@ -396,16 +453,43 @@ class DashboardServer(ThreadingHTTPServer):
             state["status"] = control["phase"]
         state["control"] = control
         state["network"] = self.network.status()
+        state["update"] = self.updater.status()
         state["server_id"] = self.server_id
         return state
+
+    def request_restart(self):
+        """Stop serving soon, so main() can start the new code in this process.
+        Never called from the serve thread: shutdown() waits for it"""
+        self.restart = True
+
+        def stop():
+            time.sleep(RESTART_DELAY_SECONDS)
+            self.shutdown()
+
+        threading.Thread(target=stop, name="gow-restart", daemon=True).start()
 
     def handle_error(self, request, client_address):
         # A dropped connection is not news, and this output must stay free of requests
         pass
 
+def restart(port):
+    """Replace this process with the updated server on the same port. Same pid, same
+    stdout and stderr, so caffeinate, launchd and the launcher all keep it. The
+    listening socket is not inherited, and the port can be bound again at once"""
+    sys.stdout.flush()
+    sys.stderr.flush()
+    try:
+        os.execv(sys.executable, [sys.executable, SERVER_SCRIPT, "--port", str(port)])
+    except OSError as e:
+        print(f"Error: the dashboard could not restart after the update ({type(e).__name__})", flush=True)
+        sys.exit(1)
+
 def main():
     parser = argparse.ArgumentParser(description="Local claim dashboard", allow_abbrev=False)
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
+    # An update runs the new code's --check before restarting into it, so every
+    # future version must keep this flag, and keep it from binding, starting or writing anything
+    parser.add_argument("--check", action="store_true", help="check that the server can start, then exit")
     options = parser.parse_args()
 
     # A SIGINT ignored at launch would pass to the child, and Stop would do nothing
@@ -417,13 +501,19 @@ def main():
         print(f"Error: {e}")
         sys.exit(1)
 
+    if options.check:
+        load_pages("check")
+        print("ok")
+        return
+
     try:
         server = DashboardServer(options.port)
     except (OSError, OverflowError) as e:
         print(f"Error: could not listen on port {options.port}: {e}")
         sys.exit(1)
 
-    print(f"Dashboard: http://{HOST}:{server.server_address[1]}/", flush=True)
+    port = server.server_address[1]
+    print(f"Dashboard: http://{HOST}:{port}/", flush=True)
 
     try:
         server.serve_forever()
@@ -432,6 +522,9 @@ def main():
     finally:
         # Any run keeps going: it has its own session and writes to a file
         server.server_close()
+
+    if server.restart:
+        restart(port)
 
 if __name__ == "__main__":
     main()

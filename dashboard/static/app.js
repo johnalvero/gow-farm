@@ -30,8 +30,23 @@ const NETWORK_BANNERS = {
   no_internet: 'No internet. Accounts may be failing. The run has not been paused.',
   site_unreachable: 'Game site unreachable. Accounts may be failing. The run has not been paused.',
 };
+const UPDATE_PROBLEMS = {
+  off: 'Update checks are off.',
+  no_git: "Git isn't available on this Mac.",
+  not_git: "This folder isn't connected to GitHub.",
+  no_upstream: "This copy isn't following a GitHub branch.",
+  fetch_failed: "Couldn't reach GitHub to check for updates.",
+  diverged: "This copy has changes GitHub doesn't have.",
+  local_changes: "Project files were edited on this Mac, so it can't update.",
+};
 const CONCURRENCY_CHOICES = [1, 2, 3, 5];
 const RESTART_NOTICE = 'The dashboard restarted. Your last action was not repeated.';
+const UPDATED_NOTICE = 'The dashboard was updated.';
+const UPDATING_TEXT = 'Updating… the page will reload';
+const UPDATE_LOST_TEXT = "The dashboard didn't come back after updating. "
+  + 'See dashboard/data/dashboard-service.log, or double-click update.command.';
+// How long the page waits for the updated server before saying it didn't come back
+const UPDATE_WAIT_MS = 90000;
 
 const token = document.querySelector('meta[name="gow-token"]').content;
 const serverId = document.querySelector('meta[name="gow-server"]').content;
@@ -48,6 +63,8 @@ const view = {
   gate: null,
   sending: false,
   reloading: false,
+  // When an update was accepted: the server is restarting into the new code
+  updating: null,
 };
 
 function node(tag, className, text) {
@@ -83,7 +100,9 @@ function setText(id, text) {
 
 function renderAlert(state) {
   let text = view.notice;
-  if (view.offline) {
+  if (view.updating) {
+    text = Date.now() - view.updating > UPDATE_WAIT_MS ? UPDATE_LOST_TEXT : UPDATING_TEXT;
+  } else if (view.offline) {
     text = 'Dashboard not responding';
   } else if (state && state.control.error) {
     text = state.control.error;
@@ -130,7 +149,7 @@ function renderGate() {
   // Closes without starting anything: a click was made against a warning that no
   // longer applies, or against a run that has since begun
   const busy = view.latest && (view.latest.live || view.latest.control.owned);
-  if (view.gate && (networkState() === 'ok' || busy)) view.gate = null;
+  if (view.gate && (networkState() === 'ok' || busy || view.updating)) view.gate = null;
 
   $('gate').hidden = !view.gate;
   if (!view.gate) return;
@@ -179,6 +198,36 @@ function renderHeader(state) {
     button.setAttribute('aria-pressed', String(Number(button.dataset.concurrency) === view.concurrency));
     button.disabled = busy;
   });
+}
+
+function updateText(update) {
+  if (!update.enabled) return UPDATE_PROBLEMS.off;
+  if (update.checking) return 'Checking for updates…';
+  if (update.problem) return UPDATE_PROBLEMS[update.problem] || '';
+  if (update.available) return update.behind === 1 ? '1 change available' : `${update.behind} changes available`;
+  if (update.checked_seconds_ago !== null) return `Up to date · checked ${duration(update.checked_seconds_ago)} ago`;
+  return '';
+}
+
+function renderUpdate(state) {
+  const { update } = state;
+  const { current } = update;
+  if (current) {
+    setText('version', `Version ${current.commit} · ${current.date}`);
+  } else {
+    setText('version', update.checking ? 'Version …' : 'Version unknown');
+  }
+  setText('update-text', updateText(update));
+
+  // A problem such as local changes would only get the update refused
+  const busy = state.live || state.control.owned;
+  const button = $('update');
+  button.hidden = !update.available || Boolean(update.problem);
+  button.textContent = busy ? 'Update after this run' : 'Update';
+  button.disabled = busy || update.checking;
+
+  $('update-check').hidden = !update.enabled;
+  $('update-check').disabled = update.checking;
 }
 
 function renderKpis(state) {
@@ -392,6 +441,7 @@ function render() {
   if (!state) return;
 
   renderHeader(state);
+  renderUpdate(state);
   renderKpis(state);
   renderProgress(state);
   renderChart(state);
@@ -399,6 +449,13 @@ function render() {
   renderAccounts(state);
   renderLog(state);
   renderRuns(state);
+
+  // Nothing may be sent to a server that is on its way out
+  if (view.updating) {
+    document.querySelectorAll('.actions button, #update, #update-check').forEach((button) => {
+      button.disabled = true;
+    });
+  }
 }
 
 async function poll() {
@@ -427,7 +484,13 @@ function reloadForNewServer() {
   view.reloading = true;
 
   sessionStorage.setItem('gow-concurrency', String(view.concurrency));
-  if (view.gate || view.notice) sessionStorage.setItem('gow-notice', RESTART_NOTICE);
+  let notice = '';
+  if (view.updating) {
+    notice = UPDATED_NOTICE;
+  } else if (view.gate || view.notice) {
+    notice = RESTART_NOTICE;
+  }
+  if (notice) sessionStorage.setItem('gow-notice', notice);
   window.location.reload();
 }
 
@@ -440,7 +503,7 @@ function restoreAfterReload() {
   sessionStorage.removeItem('gow-notice');
 }
 
-async function send(path, body) {
+async function send(path, body, accepted) {
   if (view.sending) return;
   view.sending = true;
   view.notice = '';
@@ -453,6 +516,9 @@ async function send(path, body) {
     if (!response.ok) {
       const refusal = await response.json();
       view.notice = refusal.error;
+    } else if (accepted) {
+      // Before sending is cleared, so no poll can reload or report the server gone first
+      accepted();
     }
   } catch (error) {
     view.notice = 'Dashboard not responding';
@@ -480,6 +546,16 @@ $('primary').addEventListener('click', () => {
 
 $('retry').addEventListener('click', () => {
   gated('/api/retry', 'Retry anyway');
+});
+
+$('update').addEventListener('click', () => {
+  send('/api/update', {}, () => {
+    view.updating = Date.now();
+  });
+});
+
+$('update-check').addEventListener('click', () => {
+  send('/api/update-check', {});
 });
 
 $('gate-go').addEventListener('click', () => {
