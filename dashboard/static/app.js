@@ -166,7 +166,13 @@ function renderHeader(state) {
 
   const count = state.retry_lines.length;
   const busy = owned || state.live;
-  $('retry').textContent = count ? `Retry ${count} failed` : 'Nothing to retry';
+  // The retry list comes from the last finished run, so during a run it would
+  // describe the previous one
+  if (state.live) {
+    $('retry').textContent = 'Retry after this run';
+  } else {
+    $('retry').textContent = count ? `Retry ${count} failed` : 'Nothing to retry';
+  }
   $('retry').disabled = !count || busy;
 
   document.querySelectorAll('[data-concurrency]').forEach((button) => {
@@ -193,7 +199,11 @@ function renderKpis(state) {
   setText('kpi-already', number(totals.already));
   setText('kpi-already-note', 'Cooldown still running');
   setText('kpi-failed', number(totals.failed));
-  setText('kpi-failed-note', state.retry_lines.length ? 'Can be retried' : 'Nothing to retry');
+  if (state.live) {
+    setText('kpi-failed-note', totals.failed ? 'Retry when the run ends' : 'None so far');
+  } else {
+    setText('kpi-failed-note', state.retry_lines.length ? 'Can be retried' : 'Nothing to retry');
+  }
 
   if (totals.seconds_left !== null) {
     setText('kpi-left', duration(totals.seconds_left));
