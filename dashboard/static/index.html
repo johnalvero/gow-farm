@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="gow-token" content="__GOW_TOKEN__">
+<meta name="gow-server" content="__GOW_SERVER_ID__">
+<title>Jewel Claim Dashboard</title>
+<link rel="stylesheet" href="/app.css">
+<script src="/app.js" defer></script>
+</head>
+<body>
+<div class="page">
+
+  <div class="net-strip">
+    <span id="network-dot" class="net-dot net-dot-muted" aria-hidden="true"></span>
+    <span id="network" role="status">Checking connection…</span>
+  </div>
+
+  <header class="top">
+    <div class="title">
+      <div class="title-row">
+        <h1>Jewel Claim</h1>
+        <span id="status" class="pill pill-muted">Idle</span>
+      </div>
+      <p class="subtitle">Runs on this computer only. Days use UTC.</p>
+      <p id="alert" class="alert" role="status" hidden></p>
+    </div>
+    <div class="actions">
+      <div class="browsers" role="group" aria-label="Browsers running at once">
+        <span class="browsers-label">Browsers</span>
+        <button type="button" class="choice" data-concurrency="1" aria-pressed="false">1</button>
+        <button type="button" class="choice" data-concurrency="2" aria-pressed="false">2</button>
+        <button type="button" class="choice" data-concurrency="3" aria-pressed="true">3</button>
+        <button type="button" class="choice" data-concurrency="5" aria-pressed="false">5</button>
+      </div>
+      <button type="button" id="retry" class="secondary" disabled>Nothing to retry</button>
+      <button type="button" id="primary" class="primary">Start run</button>
+    </div>
+  </header>
+
+  <div id="gate" class="gate" role="alert" hidden>
+    <p id="gate-text" class="gate-text"></p>
+    <div class="gate-actions">
+      <button type="button" id="gate-go" class="secondary">Start anyway</button>
+      <button type="button" id="gate-cancel" class="secondary">Cancel</button>
+    </div>
+  </div>
+
+  <p id="network-banner" class="net-banner" role="alert" hidden></p>
+
+  <section class="kpis" aria-label="Run totals">
+    <div class="panel kpi"><span class="kpi-label">Jewels this run</span><span id="kpi-jewels" class="kpi-value tone-claimed">–</span><span id="kpi-jewels-note" class="kpi-note">No runs yet</span></div>
+    <div class="panel kpi"><span class="kpi-label">Accounts done</span><span id="kpi-done" class="kpi-value">–</span><span id="kpi-done-note" class="kpi-note">No runs yet</span></div>
+    <div class="panel kpi"><span class="kpi-label">Already claimed</span><span id="kpi-already" class="kpi-value tone-already">–</span><span id="kpi-already-note" class="kpi-note">No runs yet</span></div>
+    <div class="panel kpi"><span class="kpi-label">Failed</span><span id="kpi-failed" class="kpi-value tone-failed">–</span><span id="kpi-failed-note" class="kpi-note">No runs yet</span></div>
+    <div class="panel kpi"><span class="kpi-label">Time left</span><span id="kpi-left" class="kpi-value">–</span><span id="kpi-left-note" class="kpi-note">No runs yet</span></div>
+    <div class="panel kpi"><span class="kpi-label">Seconds per claim</span><span id="kpi-rate" class="kpi-value">–</span><span id="kpi-rate-note" class="kpi-note">No runs yet</span></div>
+  </section>
+
+  <section class="panel stack" aria-label="Run progress">
+    <div class="panel-head">
+      <h2>Latest run</h2>
+      <span id="progress-text" class="panel-note">No run yet</span>
+    </div>
+    <div id="progress-bar" class="bar" role="img" aria-label="No run yet">
+      <div id="bar-claimed" class="fill bg-claimed"></div>
+      <div id="bar-already" class="fill bg-already"></div>
+      <div id="bar-failed" class="fill bg-failed"></div>
+    </div>
+    <div id="slots" class="slots"></div>
+  </section>
+
+  <div class="middle">
+    <section class="panel stack chart-panel" aria-label="Jewels by day">
+      <div class="panel-head">
+        <h2>Jewels by day</h2>
+        <span class="panel-note">Last 14 days, UTC</span>
+      </div>
+      <div class="chart-wrap">
+        <div id="chart" class="chart"></div>
+        <p id="chart-empty" class="chart-empty">No jewels recorded yet</p>
+      </div>
+    </section>
+
+    <section class="panel stack" aria-label="Results">
+      <h2>Results so far</h2>
+      <div class="results">
+        <div id="ring" class="ring" role="img" aria-label="No results yet">
+          <div id="ring-text" class="ring-hole">–</div>
+        </div>
+        <div class="legend">
+          <div class="legend-row"><span class="swatch bg-claimed"></span><span class="legend-name">Claimed</span><span id="legend-claimed" class="legend-value">–</span></div>
+          <div class="legend-row"><span class="swatch bg-already"></span><span class="legend-name">Already claimed</span><span id="legend-already" class="legend-value">–</span></div>
+          <div class="legend-row"><span class="swatch bg-failed"></span><span class="legend-name">Failed</span><span id="legend-failed" class="legend-value">–</span></div>
+        </div>
+      </div>
+      <p id="results-empty" class="muted-text">No results yet</p>
+      <div class="reasons">
+        <h3>Why accounts failed</h3>
+        <p id="reasons-empty" class="muted-text">No failures in this run.</p>
+        <div id="reasons" class="reason-list"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="lower">
+    <section class="panel accounts" aria-label="Accounts">
+      <div class="accounts-head">
+        <h2>Accounts</h2>
+        <div class="accounts-tools">
+          <button type="button" class="choice filter" data-filter="all" aria-pressed="true">All</button>
+          <button type="button" class="choice filter" data-filter="claimed" aria-pressed="false">Claimed</button>
+          <button type="button" class="choice filter" data-filter="already" aria-pressed="false">Already</button>
+          <button type="button" class="choice filter" data-filter="failed" aria-pressed="false">Failed</button>
+          <label class="search">
+            <span class="visually-hidden">Search accounts</span>
+            <input type="search" id="search" placeholder="Search accounts">
+          </label>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <div class="table" role="table" aria-label="Accounts processed, newest first">
+          <div class="table-row table-head" role="row">
+            <span role="columnheader">Line</span>
+            <span role="columnheader">Account</span>
+            <span role="columnheader">Characters</span>
+            <span role="columnheader">Result</span>
+            <span role="columnheader">Jewels</span>
+            <span role="columnheader">Time</span>
+          </div>
+          <div id="rows"></div>
+          <p id="rows-empty" class="table-empty">No accounts yet</p>
+        </div>
+      </div>
+      <span id="rows-note" class="kpi-note"></span>
+    </section>
+
+    <div class="side">
+      <section class="panel log-panel" aria-label="Live log">
+        <h2>Live log</h2>
+        <div id="log" class="log" role="log" aria-live="off"></div>
+        <p id="log-empty" class="muted-text">Nothing yet</p>
+      </section>
+      <section class="panel recent" aria-label="Recent runs">
+        <h2>Recent runs</h2>
+        <div id="runs"></div>
+        <p id="runs-empty" class="muted-text">No runs yet</p>
+      </section>
+    </div>
+  </div>
+</div>
+</body>
+</html>

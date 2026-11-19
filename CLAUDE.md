@@ -1,0 +1,1 @@
+- dont try to install new python modules, this project have venv setup at .venv
