@@ -216,8 +216,9 @@ h3 { margin: 0; font-size: 13px; font-weight: 600; color: var(--muted); }
 .reason-bar { height: 6px; border-radius: 3px; background: var(--empty); overflow: hidden; }
 .reason-fill { height: 100%; background: var(--coral); }
 
-.lower { display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch; }
-.accounts { flex: 999 1 560px; display: flex; flex-direction: column; gap: 12px; }
+/* Same three columns as .middle, so the side column lines up with Results so far */
+.lower { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: stretch; }
+.accounts { grid-column: span 2; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
 .accounts-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
 .accounts-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
 .filter { padding: 0 12px; font-size: 14px; font-weight: 500; }
@@ -243,7 +244,7 @@ h3 { margin: 0; font-size: 13px; font-weight: 600; color: var(--muted); }
 .cell-result { font-weight: 500; }
 .table-empty { margin: 0; padding: 18px 4px; font-size: 14px; color: var(--muted); }
 
-.side { flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.side { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
 .log-panel { flex: 1; display: flex; flex-direction: column; gap: 10px; }
 .log { display: flex; flex-direction: column; gap: 7px; max-height: 340px; overflow-y: auto; font-family: var(--mono); font-size: 12.5px; line-height: 1.4; }
 .log-line { display: flex; gap: 10px; min-width: 0; }
@@ -257,14 +258,13 @@ h3 { margin: 0; font-size: 13px; font-weight: 600; color: var(--muted); }
 .run-detail { text-align: right; }
 
 @media (max-width: 900px) {
-  .middle { grid-template-columns: minmax(0, 1fr); }
-  .chart-panel { grid-column: auto; }
+  .middle, .lower { grid-template-columns: minmax(0, 1fr); }
+  .chart-panel, .accounts { grid-column: auto; }
 }
 
 @media (max-width: 560px) {
   .actions, .browsers { flex-wrap: wrap; }
   .search, .search input { width: 100%; }
-  .accounts { flex-basis: 100%; }
   .run-row { grid-template-columns: 60px 1fr; }
   .run-detail { grid-column: 1 / -1; text-align: left; }
 }
