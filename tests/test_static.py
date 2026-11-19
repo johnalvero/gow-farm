@@ -359,5 +359,77 @@ class Readme(unittest.TestCase):
         self.assertIn("Claimed 75 jewels", sample)
 
 
+class UpdateSource(unittest.TestCase):
+    """in-app-update F1-F4"""
+    FILES = ("dashboard/server.py", "dashboard/updater.py")
+    FORBIDDEN_WORDS = ("removeprefix", "removesuffix", "functools.cache", "zoneinfo")
+    FORBIDDEN_GIT = ("pip", "install", "push", "checkout", "stash", "clean")
+
+    def test_f1_parses_as_python_3_8_without_newer_library_or_syntax(self):
+        for name in self.FILES:
+            with self.subTest(name):
+                text = source(name)
+                tree = ast.parse(text, feature_version=(3, 8))
+                for word in self.FORBIDDEN_WORDS:
+                    self.assertNotIn(word, text)
+                self.assertNotRegex(text, r"(?m)^\s*match\s")
+                self.assertFalse([n for n in ast.walk(tree) if type(n).__name__ == "Match"])
+                self.assertNotRegex(text, r"\|\s*None\b|\bNone\s*\|")
+                annotations = []
+                for n in ast.walk(tree):
+                    if isinstance(n, ast.arg) and n.annotation:
+                        annotations.append(n.annotation)
+                    elif isinstance(n, ast.AnnAssign):
+                        annotations.append(n.annotation)
+                    elif isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.returns:
+                        annotations.append(n.returns)
+                for annotation in annotations:
+                    self.assertFalse([b for b in ast.walk(annotation)
+                                      if isinstance(b, ast.BinOp) and isinstance(b.op, ast.BitOr)])
+
+    def test_f1_the_checker_catches_what_it_checks_for(self):
+        self.assertRaises(SyntaxError, ast.parse, "match x:\n    case 1: pass\n", feature_version=(3, 8))
+        self.assertRegex("def f(x: str | None): pass", r"\|\s*None\b")
+
+    def test_f2_updater_never_does_what_it_must_not(self):
+        text = source("dashboard/updater.py")
+        tree = ast.parse(text)
+        for n in ast.walk(tree):
+            if isinstance(n, ast.keyword) and n.arg == "shell":
+                self.assertIsInstance(n.value, ast.Constant)
+                self.assertIs(n.value.value, False)
+            if isinstance(n, ast.Constant) and isinstance(n.value, str):
+                self.assertNotIn(n.value, self.FORBIDDEN_GIT)
+        lists = [[e.value for e in n.elts if isinstance(e, ast.Constant)]
+                 for n in ast.walk(tree) if isinstance(n, ast.List)]
+        resets = [items for items in lists if "reset" in items]
+        self.assertTrue(resets)
+        for items in resets:
+            self.assertEqual(items[:2], ["reset", "--keep"])
+        merges = [items for items in lists if "merge" in items]
+        self.assertTrue(merges)
+        for items in merges:
+            self.assertIn("--ff-only", items)
+            self.assertIn("--no-overwrite-ignore", items)
+
+    def test_f3_update_command_is_untouched(self):
+        self.assertEqual(subprocess.run(["bash", "-n", os.path.join(PROJECT, "update.command")]).returncode, 0)
+        shown = subprocess.run(["git", "-C", PROJECT, "show", "HEAD:update.command"], capture_output=True)
+        self.assertEqual(shown.returncode, 0)
+        with open(os.path.join(PROJECT, "update.command"), "rb") as f:
+            self.assertEqual(f.read(), shown.stdout)
+
+    def test_f4_readme_leads_with_the_button_and_discloses_the_check(self):
+        text = source("README.md")
+        start = text.index("### Updating from GitHub")
+        end = text.index("\n### ", start + 5)
+        section = text[start:end]
+        self.assertIn("**Update**", section)
+        self.assertLess(section.index("**Update**"), section.index("update.command"))
+        self.assertIn("git init && git remote add origin https://github.com/johnalvero/gow-farm.git", section)
+        start = text.index("### Connection status")
+        self.assertIn("GOW_UPDATE_CHECKS", text[start:text.index("\n### ", start + 5)])
+
+
 if __name__ == "__main__":
     unittest.main()
